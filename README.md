@@ -5,9 +5,9 @@
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/giize)
 
 A Home Assistant dashboard card for **JK-BMS** batteries connected through **ESPHome** ([syssi/esphome-jk-bms](https://github.com/syssi/esphome-jk-bms)).
-Dashboard, BMS info (cell voltages, resistances, alarms, history) and BMS settings, all in one card. Thai and English UI.
+Dashboard, BMS info (cell voltages, resistances, alarms, history) and BMS settings, all in one card. 7 languages: ไทย, English, 中文, Español, Português, Deutsch, Français.
 
-การ์ดแดชบอร์ดสำหรับ Home Assistant ใช้ดูและตั้งค่า **JK-BMS** ที่ต่อผ่าน ESPHome (syssi) รองรับภาษาไทย/อังกฤษ
+การ์ดแดชบอร์ดสำหรับ Home Assistant ใช้ดูและตั้งค่า **JK-BMS** ที่ต่อผ่าน ESPHome (syssi) รองรับ 7 ภาษา
 
 ![AIG-LINK BMS Card](images/preview.png)
 
@@ -21,6 +21,7 @@ Dashboard, BMS info (cell voltages, resistances, alarms, history) and BMS settin
 - Change BMS parameters from the Settings tab (can be disabled with `readonly: true`)
 - 4 themes: AIG Neon, Carbon Volt, Solar Flare, Synthwave
 - Visual editor — no YAML needed
+- Shows only the temperature sensors your BMS actually reads
 
 ## Requirements
 
@@ -61,7 +62,7 @@ prefix: jk_bms
 | `name` | device name | Title shown in the header |
 | `view` | `full` | `full` (3 tabs), `dashboard`, `info`, `settings` |
 | `theme` | `neon` | `neon`, `carbon`, `solar`, `synth` |
-| `language` | `auto` | `auto` (follows Home Assistant), `th`, `en` |
+| `language` | `auto` | `auto` (follows Home Assistant), `th`, `en`, `zh`, `es`, `pt`, `de`, `fr` — or pick it from the chip button menu in the card |
 | `protocol` | auto | `JK04`, `JK02_24S`, `JK02_32S` |
 | `background` | `true` | Show the card background |
 | `header` | `true` | Show the header |
