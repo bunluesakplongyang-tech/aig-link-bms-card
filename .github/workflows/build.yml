@@ -1,0 +1,32 @@
+name: Build
+
+# Rebuilds dist/aig-link-bms-card.js from the sources in ha-card/ and app/ and fails if the committed bundle differs,
+# so the file HACS installs is always the one built from the readable source in this repository.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build from source and compare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install (esbuild, pinned by package-lock.json)
+        working-directory: ha-card
+        run: npm ci
+      - name: Unit tests
+        working-directory: ha-card
+        run: npm test
+      - name: Build
+        working-directory: ha-card
+        run: node build.mjs --out ../dist/aig-link-bms-card.js
+      - name: dist/ matches the source
+        run: git diff --exit-code -- dist/aig-link-bms-card.js
