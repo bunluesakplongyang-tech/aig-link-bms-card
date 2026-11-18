@@ -1,0 +1,25 @@
+# Sections view (HA 2024.6+): the dashboard tab as a card of its own, settings on a second view
+- title: แบตเตอรี่
+  path: battery
+  type: sections
+  max_columns: 4
+  sections:
+    - type: grid
+      cards:
+        - type: custom:aig-link-bms-card
+          prefix: jk_bms
+          view: dashboard
+          grid_options:
+            columns: full
+- title: ตั้งค่า BMS
+  path: battery-settings
+  type: sections
+  sections:
+    - type: grid
+      cards:
+        - type: custom:aig-link-bms-card
+          prefix: jk_bms
+          view: settings
+          header: false
+          grid_options:
+            columns: full

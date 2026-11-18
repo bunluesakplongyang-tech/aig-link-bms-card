@@ -70,6 +70,35 @@ prefix: jk_bms
 
 > ⚠️ The Settings tab writes values straight to your BMS. Wrong protection values can damage batteries — change them only if you know what they do.
 
+## Source and build
+
+`dist/aig-link-bms-card.js` is built from the readable source in this repository — nothing else goes into it:
+
+| Folder | Contents |
+|---|---|
+| [`ha-card/src/`](ha-card/src) | the card: `card.js` (element, editor, config), `screen.js` (the three tabs), `ha.js` (Home Assistant entities → BMS data, history), `host.js` (shadow DOM / overlay), `i18n.js` + `i18n-dict.js` (languages) |
+| [`app/`](app) | the AIG-LINK BMS Cloud UI modules the card draws with (widgets, theme, data model) and fonts — see [app/README.md](app/README.md) |
+| [`ha-card/build.mjs`](ha-card/build.mjs) | esbuild bundle: code + styles + fonts in one file |
+| [`ha-card/test/`](ha-card/test) | unit tests for the entity mapping (`node --test`) and a mock page |
+
+Build it yourself (Node 20+):
+
+```sh
+cd ha-card
+npm ci
+npm test
+node build.mjs --out ../dist/aig-link-bms-card.js
+```
+
+The **Build** GitHub Action does the same on every push and fails if the committed `dist/aig-link-bms-card.js` is not
+byte-for-byte the build of the source.
+
+**What the card does with your system:** it writes to the BMS only through Home Assistant services on the BMS's
+ESPHome entities (`number.set_value`, `switch.turn_on/off`, `select.select_option`, `button.press`), and only when you
+change a value or a switch in the Settings tab (turning charging or discharging off asks first). It reads history from
+Home Assistant's recorder (read-only WebSocket calls) and talks to nothing outside Home Assistant. `readonly: true`
+hides every control that writes.
+
 ## Support
 
 If this card is useful to you, you can buy me a coffee ☕

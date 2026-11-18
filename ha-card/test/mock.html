@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#03a9f4">
+<title>AIG-LINK BMS card — mock Home Assistant</title>
+<style>
+  /* roughly a Home Assistant dashboard: dark page, a toolbar, a view with padding */
+  html, body { margin: 0; background: #111111; color: #e1e1e1; font-family: Roboto, sans-serif; }
+  .toolbar { position: sticky; top: 0; z-index: 4; height: 56px; background: #101e24; display: flex; align-items: center; padding: 0 16px; font-size: 20px; }
+  .view { padding: 8px; margin: 0 auto; }
+  .side { height: 120px; background: #1c1c1c; border-radius: 12px; margin: 8px 0; display: grid; place-items: center; color: #888 }
+</style>
+</head>
+<body>
+<div class="toolbar">Home Assistant · ภาพรวม</div>
+<div class="view" id="view"></div>
+<script type="module">
+  import { makeHass } from "./mockhass.js";
+  const q = new URLSearchParams(location.search);
+  if (q.get("clear") !== "0") { try { localStorage.clear(); } catch {} }
+  if (q.get("fx")) localStorage.setItem("aigFxPref", q.get("fx"));
+  await import(q.get("src") || "../dist/aig-link-bms-card.js");
+  const view = document.getElementById("view");
+  view.style.maxWidth = (q.get("w") || "100%") + (q.get("w") ? "px" : "");
+  const hass = makeHass({ lang: q.get("lang") || "th", offline: q.has("offline"), alarms: +(q.get("alarms") || 0), old: q.has("old"), cells: +(q.get("cells") || 16), temps: +(q.get("temps") || 4), prefix: q.get("p") || "jk_bms", espDown: q.has("espdown") });
+  hass.espDown = q.has("espdownlater");
+  window.__hass = hass;
+  const cfg = { type: "custom:aig-link-bms-card" };
+  for (const k of ["prefix", "name", "view", "theme", "language", "protocol", "tab"]) if (q.get(k)) cfg[k] = q.get(k);
+  for (const k of ["background", "header", "readonly"]) if (q.has(k)) cfg[k] = q.get(k) !== "false";
+  if (q.has("before")) view.insertAdjacentHTML("beforeend", '<div class="side">entities card</div>');
+  const card = document.createElement("aig-link-bms-card");
+  window.__card = card;
+  card.setConfig(cfg);
+  card.hass = { ...hass, states: { ...hass.states } };
+  view.appendChild(card);
+  if (q.has("after")) view.insertAdjacentHTML("beforeend", '<div class="side">another card</div>'.repeat(3));
+  // Home Assistant hands every card a new hass object on each state change
+  if (!q.has("still")) setInterval(() => { hass.tick(); card.hass = { ...hass, states: { ...hass.states } }; }, +(q.get("every") || 2000));
+  window.__errors = [];
+  addEventListener("error", (e) => window.__errors.push(String(e.message)));
+</script>
+</body>
+</html>

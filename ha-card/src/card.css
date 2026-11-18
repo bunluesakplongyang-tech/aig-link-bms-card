@@ -1,0 +1,32 @@
+/* ---- AIG-LINK BMS card: the app's page layout made into a Home Assistant card (build.mjs appends this) ---- */
+:host{display:block;--safe-t:0px}
+:host(aig-link-bms-layer){display:contents}
+.aig{position:relative;display:block;container:aig/inline-size;isolation:isolate;overflow:clip;
+height:auto;border-radius:var(--ha-card-border-radius,12px);background:var(--bg);min-height:120px}
+.aig.flat{background:transparent}
+.aig>.screen{position:relative;z-index:1;min-height:0;flex:none}
+.aig .scroll{overflow:visible;flex:none}
+.aig .pad-nav{padding-bottom:6px}
+.aig .topbar{height:70px;padding-top:4px}
+/* the bottom bar stays at the bottom of the screen while the card scrolls past (not fixed to the page) */
+.aig .bottomnav{position:sticky;left:auto;right:auto;bottom:0;padding:0 8px calc(8px + var(--safe-b))}
+.aig-setup{padding:10px}
+.aig-ver{font:500 11px "Chakra Petch",Kanit,sans-serif;color:var(--sub);text-align:center;padding:12px 0 0;letter-spacing:.3px}
+
+/* backdrop (the app's Backdrop.java look): gradient, two glows and the slowly scrolling grid — CSS only, cheap.
+   1.0.6: the grid moves a whole pixel at a time (4 px/s as before) — a sub-pixel move on every frame made the browser
+   redraw the whole card 60 times a second for a drift nobody can see, and blurred the lines in between */
+.aig-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+background:radial-gradient(90% 55% at 12% 4%,color-mix(in srgb,var(--cyan) 14%,transparent),transparent 70%),
+radial-gradient(85% 50% at 92% 62%,color-mix(in srgb,var(--g2,var(--purple)) 12%,transparent),transparent 70%),
+linear-gradient(var(--bg2),var(--bg))}
+.aig-bg::before{content:"";position:absolute;left:0;right:0;top:-28px;bottom:0;will-change:transform;
+background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+background-size:28px 28px;animation:aiggrid 7s steps(28) infinite}
+@keyframes aiggrid{to{transform:translateY(28px)}}
+:host(.fx-lite) .aig-bg::before{animation-duration:14s}
+
+/* overlay layer on <body>: dialogs and toasts above Home Assistant */
+.aig-layer{height:0;background:none;overflow:visible;color:var(--tx)}
+.aig-layer .scrim{z-index:1000}
+.aig-layer .toast{z-index:1001}

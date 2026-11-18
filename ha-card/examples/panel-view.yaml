@@ -1,0 +1,12 @@
+# Dashboard → ⋮ → Edit dashboard → ⋮ → Raw configuration editor — add this view under "views:"
+# Panel view = one card across the whole screen, like the AIG-LINK BMS app
+- title: แบตเตอรี่
+  path: battery
+  icon: mdi:battery-charging-high
+  panel: true
+  cards:
+    - type: custom:aig-link-bms-card
+      prefix: jk_bms
+      # name: แบตบ้าน 16S
+      # theme: neon          # neon · carbon · solar · synth
+      # language: th

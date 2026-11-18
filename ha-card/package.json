@@ -1,0 +1,14 @@
+{
+  "name": "aig-link-bms-card",
+  "private": true,
+  "version": "1.0.14",
+  "type": "module",
+  "description": "Home Assistant Lovelace card with the AIG-LINK BMS look for JK-BMS on ESPHome (syssi/esphome-jk-bms)",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
