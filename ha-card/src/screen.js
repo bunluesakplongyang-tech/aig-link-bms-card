@@ -120,7 +120,8 @@ export function bmsScreen(ctx) {
     W.status = new StatusView(false);
     W.cells = new CellsView(0);
     W.cells.sweep = false;  // no light running across the cell bars in Home Assistant (1.0.6)
-    W.cells.chemScale = true;  // bar height and colour from the chemistry's cell range (LFP 2.40–3.65 V …) (1.0.15)
+    W.cells.autoRange = true; W.cells.fancy = true;  // auto height range around the cells, liquid bars, MAX / MIN tags (1.0.16)
+    W.cells.chemScale = true;  // bar colour (and, without autoRange, height) from the chemistry's cell range (LFP 2.40–3.65 V …) (1.0.15)
     p.classList.add("dash");
     p.append(
       h("div", null, W.gauge.el, h("div", { class: "row3" }, W.tV.el, W.tA.el, W.tP.el), W.flow.el, W.status.el),

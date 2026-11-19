@@ -669,6 +669,9 @@ export class CellsView extends CanvasCard {
     // bars scaled to the pack chemistry's whole cell range and coloured by each cell's voltage (Home Assistant card
     // 1.0.15; off = the app's zoomed scale around the cells, MAX amber / MIN blue)
     this.chemScale = false;
+    // Home Assistant card 1.0.16: bar height on an automatic range around the cells (colour still by chemistry),
+    // liquid-style bars (moving wave top, rising bubbles, flow bands) and labelled, glowing MAX / MIN bars
+    this.autoRange = false; this.fancy = false;
     this.d = null; this.shownH = new Float32Array(32); this.sLo = -1; this.sHi = -1; this.tLo = -1; this.tHi = -1;
     this.shownMax = -1; this.shownMin = -1;
     // dashboard bars: tap (or drag across) a bar to see its voltage for a moment
@@ -729,6 +732,11 @@ export class CellsView extends CanvasCard {
     this.d = d;
     const ok = !!(d && d.valid && d.cellCount > 0);
     if (ok) { this.shownMax = Math.max(0, Math.min(d.maxCell, d.cellCount - 1)); this.shownMin = Math.max(0, Math.min(d.minCell, d.cellCount - 1)); }
+    if (ok && this.autoRange) {  // the BMS's max / min cell number can lag the cell voltages: take them from the bars themselves (1.0.16)
+      let mx = -1, mn = -1;
+      for (let k = 0; k < d.cellCount; k++) { const v = d.cellV[k]; if (!(v > 0.5)) continue; if (mx < 0 || v > d.cellV[mx]) mx = k; if (mn < 0 || v < d.cellV[mn]) mn = k; }
+      if (mx >= 0) { this.shownMax = mx; this.shownMin = mn; }
+    }
     else { this.shownMax = this.shownMin = -1; }
     if (this.mode !== 0) {
       const n = ok ? d.cellCount : 0;
@@ -825,7 +833,21 @@ export class CellsView extends CanvasCard {
     return mix(C.GREEN, C.CYAN, Math.min(1, Math.abs(v - d.avgV) / 0.01));
   }
   autoScale() {
-    const d = this.d, cr = this.chemRange();
+    const d = this.d, cr = this.autoRange ? null : this.chemRange();
+    if (this.autoRange) {  // around the cells: a window 6× their spread (at least 90 mV)
+      let lo = Infinity, hi = -Infinity;
+      for (let k = 0; k < d.cellCount; k++) { const v = d.cellV[k]; if (v > 0.5) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+      if (!(hi >= lo)) { lo = 3.25; hi = 3.3; }
+      const win = Math.max(6 * (hi - lo), 0.090), mid = (lo + hi) / 2;  // at least 90 mV tall: 6 mV ≈ 7 % of the bar
+      // where the cells sit in the chemistry's range sets how high they stand (LFP 3.50 V of 2.40–3.65 → ~88 %);
+      // unknown chemistry: 60 %
+      const cr = this.chemRange(), p = cr ? Math.min(0.88, Math.max(0.15, (mid - cr[0]) / (cr[1] - cr[0]))) : 0.6;
+      this.tLo = mid - p * win; this.tHi = this.tLo + win;
+      if (this.sLo < 0) { this.sLo = this.tLo; this.sHi = this.tHi; }
+      const t = this.t(), k = fx.level === "off" ? 1 : 1 - Math.exp(-Math.min(1, Math.max(0, t - (this._st ?? t))) * 4); this._st = t;
+      this.sLo += (this.tLo - this.sLo) * k; this.sHi += (this.tHi - this.sHi) * k;
+      return;
+    }
     if (cr) {  // fixed: empty … full of the chemistry
       this.tLo = cr[0]; this.tHi = cr[1];
       if (this.sLo < 0) { this.sLo = this.tLo; this.sHi = this.tHi; }
@@ -847,35 +869,64 @@ export class CellsView extends CanvasCard {
     const gap = n > 20 ? 2 : 4, bw = (x1 - x0 - (n - 1) * gap) / n;
     this.autoScale();
     const lo = this.sLo, hi = this.sHi, t = this.t(), pulse = Math.sin(3.2 * t) * 0.5 + 0.5;
+    // fancy (1.0.16): heights follow by time, not by frame, so a slow frame rate cannot leave them behind the data
+    const dt = Math.min(1, Math.max(0, t - (this._lt ?? t))); this._lt = t;
+    const kH = this.fancy ? (fx.level === "off" ? 1 : 1 - Math.exp(-dt * 7)) : ease(0.15);
     this._bars = { x0, x1, y0, y1, bw, gap, n };
     const ta = this.tipAlpha();
     for (let i = 0; i < n; i++) {
       const v = d.cellV[i], x = x0 + (bw + gap) * i;
       const f = Math.max(0.03, Math.min(1, (v - lo) / (hi - lo)));
       const e = clamp01((t - this.enterT - i * 0.035) / 0.6);
-      this.shownH[i] += (f * easeOutBack(e) - this.shownH[i]) * ease(0.15);
+      this.shownH[i] += (f * easeOutBack(e) - this.shownH[i]) * kH;
       const hgt = (y1 - y0) * Math.max(0.03, this.shownH[i]);
       ctx.fillStyle = i === this.tip && ta > 0 ? mix(tone("#121C31"), tone("#24365A"), ta) : tone("#121C31");
       roundRect(ctx, x, y0, bw, y1 - y0, bw / 3); ctx.fill();
       const col = this.colorFor(i, v), top = y1 - hgt;
       this.tops[i] = top;
-      if (d.deltaV > 0.002 && (i === this.shownMax || i === this.shownMin)) {
-        const hc = this.chemRange() ? (i === this.shownMax ? C.AMBER : C.BLUE) : col;  // MAX / MIN halo
+      const hl = d.deltaV > 0.002 ? (i === this.shownMax ? C.AMBER : i === this.shownMin ? C.BLUE : null) : null;
+      if (hl && this.fancy) {  // MAX / MIN: a strong pulsing halo and a glowing rim
+        const hp = calm() ? 0.7 : pulse;
+        const g = ctx.createLinearGradient(0, top - 16, 0, y1); g.addColorStop(0, alpha(hl, 110 * hp + 70)); g.addColorStop(1, alpha(hl, 20));
+        ctx.fillStyle = g; roundRect(ctx, x - 5, top - 12, bw + 10, y1 - top + 12, bw / 2); ctx.fill();
+        for (let k = 4; k >= 1; k--) {
+          ctx.strokeStyle = alpha(hl, (30 + 70 * hp) * ((5 - k) / 4) ** 1.3); ctx.lineWidth = k * 2.2 + hp * 2;
+          roundRect(ctx, x, top, bw, hgt, bw / 3); ctx.stroke();
+        }
+      } else if (hl) {
+        const hc = this.chemRange() ? hl : col;  // MAX / MIN halo
         const g = ctx.createLinearGradient(0, top - 10, 0, y1); g.addColorStop(0, alpha(hc, 60 * pulse + 40)); g.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = g; roundRect(ctx, x - 3, top - 8, bw + 6, y1 - top + 8, bw / 2); ctx.fill();
       }
       const g = ctx.createLinearGradient(0, top, 0, y1); g.addColorStop(0, col); g.addColorStop(1, alpha(col, 70));
       ctx.fillStyle = g; roundRect(ctx, x, top, bw, hgt, bw / 3); ctx.fill();
-      ctx.fillStyle = alpha(C.TEXT, (Math.sin(2.4 * t - i * 0.45) * 0.5 + 0.5) * 70 + 30);
-      roundRect(ctx, x + 0.2 * bw, top + 3, 0.6 * bw, 2.5, 2); ctx.fill();
+      if (this.fancy) this.liquid(ctx, x, top, bw, hgt, y1, i, t, col, hl);
+      else {
+        ctx.fillStyle = alpha(C.TEXT, (Math.sin(2.4 * t - i * 0.45) * 0.5 + 0.5) * 70 + 30);
+        roundRect(ctx, x + 0.2 * bw, top + 3, 0.6 * bw, 2.5, 2); ctx.fill();
+      }
       if (i === this.tip && ta > 0) {
         ctx.strokeStyle = alpha(C.TEXT, 210 * ta); ctx.lineWidth = 1.5;
         roundRect(ctx, x - 1.5, top - 1.5, bw + 3, hgt + 3, bw / 3 + 1.5); ctx.stroke();
       }
       const tipped = i === this.tip && ta > 0;
-      if (n <= 24 || i % 2 === 0 || tipped) text(ctx, String(i + 1), x + bw / 2, y1 + 14, { size: 9.5, weight: tipped ? 700 : 500, color: tipped ? C.TEXT : C.SUB, align: "center" });
+      const hlN = this.fancy && hl;
+      if (n <= 24 || i % 2 === 0 || tipped || hlN) text(ctx, String(i + 1), x + bw / 2, y1 + 14, { size: 9.5, weight: tipped || hlN ? 700 : 500, color: tipped ? C.TEXT : hlN ? hl : C.SUB, align: "center" });
     }
     this.avgLine(ctx, x0, x1, y0, y1, lo, hi, t);
+    if (this.fancy && d.deltaV > 0.002 && ta <= 0) {  // floating MAX / MIN tags over their bars
+      [[this.shownMax, C.AMBER, "MAX"], [this.shownMin, C.BLUE, "MIN"]].forEach(([i, hl, lab], k) => {
+        if (i < 0 || i >= n) return;
+        const cx = x0 + (bw + gap) * i + bw / 2, bob = calm() ? 0 : Math.sin(t * 2.6 + k * Math.PI) * 2;
+        const w = measure(ctx, lab, 8.5, 700, "Chakra Petch") + 10, h = 14;
+        const py = Math.max(y0 - 18, this.tops[i] - 14 - h + bob), px = Math.max(b.left + 4, Math.min(b.right - 4 - w, cx - w / 2));
+        ctx.fillStyle = alpha(hl, 60); roundRect(ctx, px - 2, py - 2, w + 4, h + 4, 9); ctx.fill();
+        ctx.fillStyle = tone("#0A1222"); roundRect(ctx, px, py, w, h, 7); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(cx - 4, py + h - 0.5); ctx.lineTo(cx, py + h + 4); ctx.lineTo(cx + 4, py + h - 0.5); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = hl; ctx.lineWidth = 1.2; roundRect(ctx, px + 0.5, py + 0.5, w - 1, h - 1, 6.5); ctx.stroke();
+        text(ctx, lab, px + w / 2, py + 10.2, { size: 8.5, weight: 700, family: "Chakra Petch", color: hl, align: "center" });
+      });
+    }
     if (this.sweep) {
       const sx = x0 + (x1 - x0 + 80) * ((t * 0.35) % 1) - 40;
       const g = ctx.createLinearGradient(sx - 40, 0, sx + 40, 0);
@@ -883,6 +934,41 @@ export class CellsView extends CanvasCard {
       ctx.fillStyle = g; ctx.fillRect(Math.max(x0, sx - 40), y0, Math.max(0, Math.min(x1, sx + 40) - Math.max(x0, sx - 40)), y1 - y0);
     }
     if (this.tip >= 0 && this.tip < n && ta > 0) this.drawTip(ctx, b, this.tip, x0 + (bw + gap) * this.tip + bw / 2, this.tops[this.tip], ta);
+  }
+  // liquid bar (1.0.16): flow bands moving up while charging / down while discharging, bubbles rising, a moving wave
+  // on the top. Reduced motion: only the wave line, still.
+  liquid(ctx, x, top, bw, hgt, y1, i, t, col, hl) {
+    const d = this.d, still = calm();
+    const dir = d.current > 0.15 ? -1 : d.current < -0.15 ? 1 : 0;
+    const speed = dir ? 10 + 30 * Math.min(1, Math.abs(d.current) / Math.max(10, d.maxChgA || 100)) : 0;
+    ctx.save();
+    roundRect(ctx, x, top, bw, hgt, bw / 3); ctx.clip();
+    if (!still && hgt > 8) {
+      if (dir) {  // diagonal light bands
+        const per = 22, off = ((t * speed * dir) % per + per) % per;
+        ctx.fillStyle = alpha(C.TEXT, 22);
+        for (let yy = top - per + off; yy < y1 + per; yy += per) {
+          ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + bw, yy - 7); ctx.lineTo(x + bw, yy - 1); ctx.lineTo(x, yy + 6); ctx.closePath(); ctx.fill();
+        }
+      }
+      for (let k = 0; k < 3; k++) {  // bubbles
+        const h1 = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453, r0 = h1 - Math.floor(h1);
+        const ph = (t * (0.18 + 0.12 * r0) + r0 + k / 3) % 1;
+        const by = y1 - ph * hgt, bx = x + bw * (0.25 + 0.5 * ((r0 * 7) % 1)) + Math.sin(t * 2 + k + i) * bw * 0.08;
+        ctx.fillStyle = alpha(C.TEXT, Math.sin(ph * Math.PI) * 110);
+        ctx.beginPath(); ctx.arc(bx, by, Math.max(0.8, bw * 0.05) * (1 + r0), 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    // wave on the top surface
+    const amp = still ? 0 : Math.min(1.6, hgt / 10), ph0 = t * 3 + i * 0.7;
+    ctx.beginPath();
+    for (let s = 0; s <= 8; s++) { const xx = x + (bw * s) / 8, yy = top + 3 + Math.sin(ph0 + (s / 8) * Math.PI * 2) * amp; s ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+    ctx.lineTo(x + bw, top - 4); ctx.lineTo(x, top - 4); ctx.closePath();
+    ctx.fillStyle = alpha(mix(col, C.TEXT, 0.55), 120); ctx.fill();
+    ctx.restore();
+    if (hl) {  // bright cap on MAX / MIN
+      ctx.fillStyle = alpha(mix(hl, C.TEXT, 0.4), 230); roundRect(ctx, x + 0.15 * bw, top + 1.5, 0.7 * bw, 2.5, 1.5); ctx.fill();
+    }
   }
   // cell number in a small framed badge (2.0.28, was "#01"): the theme's accent colour — or the MAX / MIN tile's —
   // with a glow wave running across the grid cell by cell
