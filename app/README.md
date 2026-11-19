@@ -15,7 +15,9 @@ This folder holds only the files the card uses (nothing else of the app is neede
 | `public/fonts/` | Kanit, Chakra Petch, Orbitron (woff2), inlined into the bundle |
 
 `ha-card/build.mjs` applies a few exact-text patches to these modules at build time (dialogs go into the card's
-overlay instead of `<body>`, theme variables onto the card instead of `<html>` …) — the files here are unchanged copies.
+overlay instead of `<body>`, theme variables onto the card instead of `<html>` …) — the files here are otherwise the
+app's own. `widgets.js` has one option only the card turns on: `CellsView.chemScale` (cell bars scaled to the pack
+chemistry's whole cell range and coloured by voltage, 1.0.15).
 
 ## Fonts
 

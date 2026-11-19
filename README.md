@@ -16,7 +16,7 @@ Dashboard, BMS info (cell voltages, resistances, alarms, history) and BMS settin
 - Auto-detects every JK-BMS in Home Assistant (looks for `sensor.<prefix>_total_voltage`), up to 32 cells
 - Three tabs: **Dashboard**, **BMS Info**, **Settings** — or show just one
 - State of charge gauge, energy flow, charge/discharge/balance status, cell delta, temperatures, cycles
-- Cell voltage grid with min/max highlight and cell resistance
+- Cell voltage bars scaled to the battery chemistry (LFP 2.40–3.65 V, NMC 3.20–4.20 V, LTO 1.50–2.80 V) and coloured by each cell's voltage; cell grid with min/max highlight and cell resistance
 - History charts from the Home Assistant recorder
 - Change BMS parameters from the Settings tab (can be disabled with `readonly: true`)
 - 4 themes: AIG Neon, Carbon Volt, Solar Flare, Synthwave

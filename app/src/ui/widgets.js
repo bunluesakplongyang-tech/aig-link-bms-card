@@ -666,6 +666,9 @@ export class CellsView extends CanvasCard {
     super(mode === 0 ? 230 : 120, { cls: "w-cells", accent: C.CYAN });
     this.mode = mode; this.shimmer = mode === 0;
     this.sweep = true;  // the light running across the bars (the Home Assistant card turns it off, 2.0.35)
+    // bars scaled to the pack chemistry's whole cell range and coloured by each cell's voltage (Home Assistant card
+    // 1.0.15; off = the app's zoomed scale around the cells, MAX amber / MIN blue)
+    this.chemScale = false;
     this.d = null; this.shownH = new Float32Array(32); this.sLo = -1; this.sHi = -1; this.tLo = -1; this.tHi = -1;
     this.shownMax = -1; this.shownMin = -1;
     // dashboard bars: tap (or drag across) a bar to see its voltage for a moment
@@ -798,15 +801,37 @@ export class CellsView extends CanvasCard {
     const d = this.d;
     if (this.mode === 1 && d && d.valid && d.cellCount > 0) this.grid(ctx, b, d.cellCount, "static");
   }
+  // a cell's range by chemistry, [empty, full] in volts: LFP 2.40–3.65, NMC 3.20–4.20, LTO 1.50–2.80 (1.0.15)
+  static RANGE = [[2.4, 3.65], [3.2, 4.2], [1.5, 2.8]];
+  chemRange() { const d = this.d; return this.chemScale && d ? CellsView.RANGE[d.battType] || null : null; }
+  // colour by where the voltage sits in that range: red near empty → amber → green → cyan near full → purple at the
+  // top, red again above full
+  static voltColor(v, lo, hi) {
+    const f = (v - lo) / (hi - lo);
+    if (f > 1.0) return C.RED;
+    if (f < 0.05) return C.RED;
+    if (f < 0.2) return mix(C.RED, C.AMBER, (f - 0.05) / 0.15);
+    if (f < 0.4) return mix(C.AMBER, C.GREEN, (f - 0.2) / 0.2);
+    if (f < 0.85) return mix(C.GREEN, C.CYAN, (f - 0.4) / 0.45);
+    return mix(C.CYAN, C.PURPLE, (f - 0.85) / 0.15);
+  }
   colorFor(i, v) {
     const d = this.d;
     if (v < 0.5) return C.RED;
+    const cr = this.chemRange();
+    if (cr) return CellsView.voltColor(v, cr[0], cr[1]);
     if (i === this.shownMax && d.deltaV > 0.002) return C.AMBER;
     if (i === this.shownMin && d.deltaV > 0.002) return C.BLUE;
     return mix(C.GREEN, C.CYAN, Math.min(1, Math.abs(v - d.avgV) / 0.01));
   }
   autoScale() {
-    const d = this.d;
+    const d = this.d, cr = this.chemRange();
+    if (cr) {  // fixed: empty … full of the chemistry
+      this.tLo = cr[0]; this.tHi = cr[1];
+      if (this.sLo < 0) { this.sLo = this.tLo; this.sHi = this.tHi; }
+      this.sLo += (this.tLo - this.sLo) * ease(0.08); this.sHi += (this.tHi - this.sHi) * ease(0.08);
+      return;
+    }
     let lo = d.minV, hi = d.maxV;
     if (!(lo > 0.2 && hi >= lo)) { lo = 3.25; hi = 3.3; }
     const mid = (lo + hi) / 2, span = hi - lo;
@@ -835,7 +860,8 @@ export class CellsView extends CanvasCard {
       const col = this.colorFor(i, v), top = y1 - hgt;
       this.tops[i] = top;
       if (d.deltaV > 0.002 && (i === this.shownMax || i === this.shownMin)) {
-        const g = ctx.createLinearGradient(0, top - 10, 0, y1); g.addColorStop(0, alpha(col, 60 * pulse + 40)); g.addColorStop(1, "rgba(0,0,0,0)");
+        const hc = this.chemRange() ? (i === this.shownMax ? C.AMBER : C.BLUE) : col;  // MAX / MIN halo
+        const g = ctx.createLinearGradient(0, top - 10, 0, y1); g.addColorStop(0, alpha(hc, 60 * pulse + 40)); g.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = g; roundRect(ctx, x - 3, top - 8, bw + 6, y1 - top + 8, bw / 2); ctx.fill();
       }
       const g = ctx.createLinearGradient(0, top, 0, y1); g.addColorStop(0, col); g.addColorStop(1, alpha(col, 70));
