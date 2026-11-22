@@ -671,7 +671,7 @@ export class CellsView extends CanvasCard {
     this.chemScale = false;
     // Home Assistant card 1.0.16: bar height on an automatic range around the cells (colour still by chemistry),
     // liquid-style bars (moving wave top, rising bubbles, flow bands) and labelled, glowing MAX / MIN bars
-    this.autoRange = false; this.fancy = false;
+    this.autoRange = false; this.fancy = false; this.pickShown = false;
     this.d = null; this.shownH = new Float32Array(32); this.sLo = -1; this.sHi = -1; this.tLo = -1; this.tHi = -1;
     this.shownMax = -1; this.shownMin = -1;
     // dashboard bars: tap (or drag across) a bar to see its voltage for a moment
@@ -731,13 +731,13 @@ export class CellsView extends CanvasCard {
   set(d) {
     this.d = d;
     const ok = !!(d && d.valid && d.cellCount > 0);
-    if (ok) { this.shownMax = Math.max(0, Math.min(d.maxCell, d.cellCount - 1)); this.shownMin = Math.max(0, Math.min(d.minCell, d.cellCount - 1)); }
-    if (ok && this.autoRange) {  // the BMS's max / min cell number can lag the cell voltages: take them from the bars themselves (1.0.16)
+    if (!ok) this.shownMax = this.shownMin = -1;
+    else if (this.autoRange || this.pickShown) {  // the BMS's max / min cell number can lag the cell voltages: take them from the shown voltages (1.0.16)
       let mx = -1, mn = -1;
       for (let k = 0; k < d.cellCount; k++) { const v = d.cellV[k]; if (!(v > 0.5)) continue; if (mx < 0 || v > d.cellV[mx]) mx = k; if (mn < 0 || v < d.cellV[mn]) mn = k; }
-      if (mx >= 0) { this.shownMax = mx; this.shownMin = mn; }
-    }
-    else { this.shownMax = this.shownMin = -1; }
+      this.shownMax = mx >= 0 ? mx : Math.max(0, Math.min(d.maxCell, d.cellCount - 1));
+      this.shownMin = mn >= 0 ? mn : Math.max(0, Math.min(d.minCell, d.cellCount - 1));
+    } else { this.shownMax = Math.max(0, Math.min(d.maxCell, d.cellCount - 1)); this.shownMin = Math.max(0, Math.min(d.minCell, d.cellCount - 1)); }
     if (this.mode !== 0) {
       const n = ok ? d.cellCount : 0;
       const cols = CellsView.cols(n, this.w || this.el.clientWidth || 360);

@@ -204,6 +204,7 @@ export function bmsScreen(ctx) {
     p.classList.add("info-grid");
     I.kvCells = kvCard(L.t("ข้อมูลเซลล์", "Cells"), "cell", C.CYAN);
     I.grid = new CellsView(1);
+    I.grid.pickShown = true;  // MAX / MIN tiles from the shown voltages (1.0.17)
     I.kvBatt = kvCard(L.t("แบตเตอรี่", "Battery"), "battery", C.BLUE);
     I.hist = new HistoryChart();
     I.status = new StatusView(true);
